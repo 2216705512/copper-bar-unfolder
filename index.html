@@ -33,6 +33,11 @@ button.running { background: #b8860b; pointer-events: none; }
 <h1 id="title">铜排展开软件 <span style="font-size:0.7em;color:#888;font-weight:normal;">| Copper Bar Unfolder</span></h1>
 <p id="subtitle" style="color:#888;font-size:13px;margin-top:0;">上传 STEP 模型 → 一键展平 → 下载结果</p>
 
+<div class="card" style="text-align:center;padding:12px;">
+  <img src="CopperBar.png" alt="铜排示例" style="max-width:100%;max-height:320px;border-radius:4px;">
+  <p id="imgCaption" style="color:#888;font-size:12px;margin:8px 0 0 0;">支持平面折弯、垂直折弯、扭转等多种铜排类型</p>
+</div>
+
 <div class="card">
   <h3 id="instrTitle">使用说明</h3>
   <ol id="instrList" style="margin:4px 0;padding-left:20px;font-size:13px;color:#b0b0b0;line-height:1.8;">
@@ -109,6 +114,7 @@ const T = {
     success: '计算 + 展平模型 成功',
     failed: '计算失败',
     fileLoaded: '已加载',
+    imgCaption: '支持平面折弯、垂直折弯、扭转等多种铜排类型',
   },
   en: {
     subtitle: 'Upload STEP model → One-click unfold → Download result',
@@ -138,6 +144,7 @@ const T = {
     success: 'Compute + Unfold succeeded',
     failed: 'Compute failed',
     fileLoaded: 'Loaded',
+    imgCaption: 'Supports flat bends, vertical bends, twists and more copper bar types',
   }
 };
 
@@ -159,6 +166,7 @@ function applyLang() {
   document.getElementById('btnComputeBox').innerHTML = t('computeBtn') + ' <span class="spinner" id="computeSpinner"></span>';
   document.getElementById('dlTitle').textContent = t('dlTitle');
   document.getElementById('downloadLink').textContent = t('dlLink');
+  document.getElementById('imgCaption').textContent = t('imgCaption');
   document.getElementById('langSwitch').textContent = lang === 'zh' ? 'English' : '中文';
 }
 
