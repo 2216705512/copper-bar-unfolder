@@ -18,6 +18,10 @@ button:disabled { background: #555; cursor: not-allowed; }
 .success { background: #1e3a1e; color: #4ec94e; }
 .error { background: #3a1e1e; color: #e74c3c; }
 .info { background: #1e2e3a; color: #569cd6; }
+#downloadProgress { display:none; margin: 8px 0; }
+#progressBar { width:100%; height:8px; background:#333; border-radius:4px; overflow:hidden; }
+#progressFill { height:100%; width:0%; background:linear-gradient(90deg, #0e639c, #4ec94e); border-radius:4px; transition: width 0.3s; }
+#progressText { font-size:12px; color:#888; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -55,6 +59,11 @@ button:disabled { background: #555; cursor: not-allowed; }
 
 <div id="status"></div>
 
+<div id="downloadProgress">
+  <div id="progressBar"><div id="progressFill"></div></div>
+  <div id="progressText"></div>
+</div>
+
 <div class="card" id="downloadCard" style="display:none;">
   <h3 id="dlTitle">展平模型下载</h3>
   <a id="downloadLink" href="#" download="unfolded_box.stp" style="display:inline-block;background:#0e639c;color:#fff;padding:10px 24px;border-radius:4px;text-decoration:none;font-size:15px;">下载展平后的 STEP 文件</a>
@@ -89,9 +98,9 @@ const T = {
     computeBtn: '获取展平后的 STEP 模型',
     dlTitle: '展平模型下载',
     dlLink: '下载展平后的 STEP 文件',
-    loading: '正在加载 WASM 模块...',
-    loaded: 'WASM 模块加载成功',
-    loadFailed: 'WASM 加载失败',
+    loading: '正在下载展开算法...',
+    loaded: '算法下载完成，初始化中...',
+    loadFailed: '算法下载失败',
     noFile: '请先加载 STEP 文件',
     computing: '正在计算并展平模型...',
     success: '计算 + 展平模型 成功',
@@ -118,9 +127,9 @@ const T = {
     computeBtn: 'Get Unfolded STEP Model',
     dlTitle: 'Unfolded Model Download',
     dlLink: 'Download Unfolded STEP File',
-    loading: 'Loading WASM module...',
-    loaded: 'WASM module loaded',
-    loadFailed: 'WASM load failed',
+    loading: 'Downloading unfolding engine...',
+    loaded: 'Engine downloaded, initializing...',
+    loadFailed: 'Engine download failed',
     noFile: 'Please load a STEP file first',
     computing: 'Computing and unfolding...',
     success: 'Compute + Unfold succeeded',
@@ -162,17 +171,91 @@ window.toggleLang = function() {
   }
 };
 
+function showProgress(percent, msg) {
+  const el = document.getElementById('downloadProgress');
+  el.style.display = 'block';
+  document.getElementById('progressFill').style.width = percent + '%';
+  document.getElementById('progressText').textContent = msg + ' (' + percent.toFixed(0) + '%)';
+}
+
+function hideProgress() {
+  document.getElementById('downloadProgress').style.display = 'none';
+}
+
 async function init() {
     applyLang();
+
+    const wasmUrl = new URL('./sheet_metal_unfolder.wasm', import.meta.url).href;
+    const wasmSizeMB = 5.5; // gzip compressed size, approximate
+
+    // First, try to get actual WASM file size via HEAD request
+    let totalBytes = wasmSizeMB * 1024 * 1024;
+    try {
+      const headResp = await fetch(wasmUrl, { method: 'HEAD' });
+      if (headResp.ok) {
+        const cl = headResp.headers.get('content-length');
+        if (cl) totalBytes = parseInt(cl);
+      }
+    } catch(e) {}
+
     showStatus('info', t('loading'));
+    showProgress(0, lang === 'zh' ? '正在连接服务器...' : 'Connecting to server...');
+
     try {
         mod = await SheetMetalUnfolderModule({
             print: t => console.log('[out]', t),
             printErr: t => console.error('[err]', t),
+            instantiateWasm: function(imports, successCallback) {
+              const xhr = new XMLHttpRequest();
+              xhr.open('GET', wasmUrl, true);
+              xhr.responseType = 'arraybuffer';
+
+              let lastPercent = 0;
+              xhr.onprogress = function(e) {
+                if (e.lengthComputable && e.total > 0) {
+                  totalBytes = e.total;
+                }
+                const pct = totalBytes > 0 ? Math.min(99, (e.loaded / totalBytes) * 100) : lastPercent;
+                if (pct - lastPercent > 0.5 || pct >= 99) {
+                  lastPercent = pct;
+                  const loadedMB = (e.loaded / 1024 / 1024).toFixed(1);
+                  const totalMB = (totalBytes / 1024 / 1024).toFixed(1);
+                  showProgress(pct, (lang === 'zh' ? '正在下载展开算法' : 'Downloading unfolding engine') 
+                    + ' ' + loadedMB + ' / ' + totalMB + ' MB');
+                }
+              };
+
+              xhr.onload = function() {
+                if (xhr.status === 200 || xhr.status === 304 || xhr.status === 0) {
+                  showProgress(99, lang === 'zh' ? '正在编译算法...' : 'Compiling engine...');
+                  const wasmBinary = xhr.response;
+                  WebAssembly.instantiate(wasmBinary, imports).then(function(result) {
+                    showProgress(100, lang === 'zh' ? '算法就绪' : 'Engine ready');
+                    successCallback(result.instance, result.module);
+                  }).catch(function(err) {
+                    showStatus('error', t('loadFailed') + ': ' + err.message);
+                    hideProgress();
+                  });
+                } else {
+                  showStatus('error', t('loadFailed') + ': HTTP ' + xhr.status);
+                  hideProgress();
+                }
+              };
+
+              xhr.onerror = function() {
+                showStatus('error', t('loadFailed'));
+                hideProgress();
+              };
+
+              xhr.send();
+              return {};
+            },
         });
+        hideProgress();
         showStatus('success', t('loaded'));
         document.getElementById('btnComputeBox').disabled = false;
     } catch (e) {
+        hideProgress();
         showStatus('error', t('loadFailed') + ': ' + e.message);
     }
 }
