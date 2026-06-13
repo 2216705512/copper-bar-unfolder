@@ -27,7 +27,7 @@ button:disabled { background: #555; cursor: not-allowed; }
 <body>
 
 <button id="langSwitch" onclick="toggleLang()">English</button>
-<h1 id="title">铜排展开软件</h1>
+<h1 id="title">铜排展开软件 <span style="font-size:0.7em;color:#888;font-weight:normal;">| Copper Bar Unfolder</span></h1>
 <p id="subtitle" style="color:#888;font-size:13px;margin-top:0;">上传 STEP 模型 → 一键展平 → 下载结果</p>
 
 <div class="card">
@@ -141,7 +141,6 @@ const T = {
 function t(key) { return T[lang][key]; }
 
 function applyLang() {
-  document.getElementById('title').textContent = lang === 'zh' ? '铜排展开软件' : 'Copper Bar Unfolder';
   document.getElementById('subtitle').textContent = t('subtitle');
   document.getElementById('instrTitle').textContent = t('instrTitle');
   const ol = document.getElementById('instrList');
