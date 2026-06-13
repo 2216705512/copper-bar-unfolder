@@ -2,16 +2,18 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>铜排展开软件</title>
+<title>铜排展开软件 | Copper Bar Unfolder</title>
 <style>
 body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; margin: 20px; background: #1e1e1e; color: #d4d4d4; }
-h1 { color: #569cd6; }
+h1 { color: #569cd6; margin-bottom: 4px; }
 .card { background: #252526; border: 1px solid #444; border-radius: 6px; padding: 16px; margin: 12px 0; }
 label { margin: 0 4px 0 12px; font-size: 13px; }
 input[type=number] { width: 80px; background: #3c3c3c; color: #d4d4d4; border: 1px solid #555; padding: 3px 4px; font-size: 13px; }
 button { background: #0e639c; color: #fff; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; margin: 4px; }
 button:hover { background: #1177bb; }
 button:disabled { background: #555; cursor: not-allowed; }
+#langSwitch { float: right; background: #333; border: 1px solid #555; color: #bbb; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-top: 4px; }
+#langSwitch:hover { background: #444; color: #fff; }
 #status { padding: 8px; margin: 8px 0; border-radius: 4px; }
 .success { background: #1e3a1e; color: #4ec94e; }
 .error { background: #3a1e1e; color: #e74c3c; }
@@ -19,43 +21,42 @@ button:disabled { background: #555; cursor: not-allowed; }
 </style>
 </head>
 <body>
-<h1>铜排展开软件</h1>
+
+<button id="langSwitch" onclick="toggleLang()">English</button>
+<h1 id="title">铜排展开软件</h1>
+<p id="subtitle" style="color:#888;font-size:13px;margin-top:0;">上传 STEP 模型 → 一键展平 → 下载结果</p>
 
 <div class="card">
-  <h3>使用说明</h3>
-  <ol style="margin:4px 0;padding-left:20px;font-size:13px;color:#b0b0b0;line-height:1.8;">
-    <li>点击"加载 STEP 文件"，选择铜排的 <code style="background:#3c3c3c;padding:1px 5px;border-radius:3px;">.step</code> 或 <code style="background:#3c3c3c;padding:1px 5px;border-radius:3px;">.stp</code> 三维模型文件。</li>
-    <li>调整参数（默认 -1 表示使用自动计算值，通常无需修改）。</li>
-    <li>点击"获取展平后的 STEP 模型"按钮，等待计算完成。</li>
-    <li>在下方"展平模型下载"区域点击链接，即可下载展开后的 STEP 文件。</li>
+  <h3 id="instrTitle">使用说明</h3>
+  <ol id="instrList" style="margin:4px 0;padding-left:20px;font-size:13px;color:#b0b0b0;line-height:1.8;">
   </ol>
 </div>
 
 <div class="card">
-  <h3>选择文件</h3>
+  <h3 id="fileTitle">选择文件</h3>
   <input type="file" id="fileInput" accept=".step,.stp">
 </div>
 
 <div class="card">
-  <h3>参数设置</h3>
+  <h3 id="paramTitle">参数设置</h3>
   <p style="white-space:nowrap;">
-    <label>平面K系数:</label><input type="number" id="flatK" value="-1" step="0.01">
-    <label>平面弯曲半径:</label><input type="number" id="flatR" value="-1" step="0.01">
-    <label>垂直K系数:</label><input type="number" id="vertK" value="-1" step="0.01">
-    <label>垂直弯曲半径:</label><input type="number" id="vertR" value="-1" step="0.01">
-    <label>扭转系数:</label><input type="number" id="twistC" value="1.0" step="0.01">
+    <label id="lblFlatK">平面K系数:</label><input type="number" id="flatK" value="-1" step="0.01">
+    <label id="lblFlatR">平面弯曲半径:</label><input type="number" id="flatR" value="-1" step="0.01">
+    <label id="lblVertK">垂直K系数:</label><input type="number" id="vertK" value="-1" step="0.01">
+    <label id="lblVertR">垂直弯曲半径:</label><input type="number" id="vertR" value="-1" step="0.01">
+    <label id="lblTwist">扭转系数:</label><input type="number" id="twistC" value="1.0" step="0.01">
   </p>
 </div>
 
 <div class="card">
-  <h3>操作</h3>
+  <h3 id="actionTitle">操作</h3>
   <button id="btnComputeBox" disabled>获取展平后的 STEP 模型</button>
 </div>
 
 <div id="status"></div>
 
 <div class="card" id="downloadCard" style="display:none;">
-  <h3>展平模型下载</h3>
+  <h3 id="dlTitle">展平模型下载</h3>
   <a id="downloadLink" href="#" download="unfolded_box.stp" style="display:inline-block;background:#0e639c;color:#fff;padding:10px 24px;border-radius:4px;text-decoration:none;font-size:15px;">下载展平后的 STEP 文件</a>
   <span id="downloadSize" style="margin-left:12px;color:#888;font-size:13px;"></span>
 </div>
@@ -65,24 +66,121 @@ import SheetMetalUnfolderModule from './sheet_metal_unfolder.js';
 
 let mod = null;
 let stepBuffer = null;
+let lang = 'zh';
+
+const T = {
+  zh: {
+    subtitle: '上传 STEP 模型 → 一键展平 → 下载结果',
+    instrTitle: '使用说明',
+    instr: [
+      '选择铜排的 <code style="background:#3c3c3c;padding:1px 5px;border-radius:3px;">.step</code> 或 <code style="background:#3c3c3c;padding:1px 5px;border-radius:3px;">.stp</code> 三维模型文件。',
+      '调整参数（默认 -1 表示使用自动计算值，通常无需修改）。',
+      '点击"获取展平后的 STEP 模型"按钮，等待计算完成。',
+      '在下方"展平模型下载"区域点击链接，即可下载展开后的 STEP 文件。'
+    ],
+    fileTitle: '选择文件',
+    paramTitle: '参数设置',
+    lblFlatK: '平面K系数:',
+    lblFlatR: '平面弯曲半径:',
+    lblVertK: '垂直K系数:',
+    lblVertR: '垂直弯曲半径:',
+    lblTwist: '扭转系数:',
+    actionTitle: '操作',
+    computeBtn: '获取展平后的 STEP 模型',
+    dlTitle: '展平模型下载',
+    dlLink: '下载展平后的 STEP 文件',
+    loading: '正在加载 WASM 模块...',
+    loaded: 'WASM 模块加载成功',
+    loadFailed: 'WASM 加载失败',
+    noFile: '请先加载 STEP 文件',
+    computing: '正在计算并展平模型...',
+    success: '计算 + 展平模型 成功',
+    failed: '计算失败',
+    fileLoaded: '已加载',
+  },
+  en: {
+    subtitle: 'Upload STEP model → One-click unfold → Download result',
+    instrTitle: 'Instructions',
+    instr: [
+      'Select a copper bar <code style="background:#3c3c3c;padding:1px 5px;border-radius:3px;">.step</code> or <code style="background:#3c3c3c;padding:1px 5px;border-radius:3px;">.stp</code> 3D model file.',
+      'Adjust parameters (default -1 means auto-calculated, usually no change needed).',
+      'Click "Get Unfolded STEP Model", wait for computation to finish.',
+      'Click the download link in the "Unfolded Model Download" section to get the result STEP file.'
+    ],
+    fileTitle: 'Select File',
+    paramTitle: 'Parameters',
+    lblFlatK: 'Flat K-Factor:',
+    lblFlatR: 'Flat Bend Radius:',
+    lblVertK: 'Vertical K-Factor:',
+    lblVertR: 'Vertical Bend Radius:',
+    lblTwist: 'Twist Coefficient:',
+    actionTitle: 'Action',
+    computeBtn: 'Get Unfolded STEP Model',
+    dlTitle: 'Unfolded Model Download',
+    dlLink: 'Download Unfolded STEP File',
+    loading: 'Loading WASM module...',
+    loaded: 'WASM module loaded',
+    loadFailed: 'WASM load failed',
+    noFile: 'Please load a STEP file first',
+    computing: 'Computing and unfolding...',
+    success: 'Compute + Unfold succeeded',
+    failed: 'Compute failed',
+    fileLoaded: 'Loaded',
+  }
+};
+
+function t(key) { return T[lang][key]; }
+
+function applyLang() {
+  document.getElementById('title').textContent = lang === 'zh' ? '铜排展开软件' : 'Copper Bar Unfolder';
+  document.getElementById('subtitle').textContent = t('subtitle');
+  document.getElementById('instrTitle').textContent = t('instrTitle');
+  const ol = document.getElementById('instrList');
+  ol.innerHTML = t('instr').map(i => '<li>' + i + '</li>').join('');
+  document.getElementById('fileTitle').textContent = t('fileTitle');
+  document.getElementById('paramTitle').textContent = t('paramTitle');
+  document.getElementById('lblFlatK').textContent = t('lblFlatK');
+  document.getElementById('lblFlatR').textContent = t('lblFlatR');
+  document.getElementById('lblVertK').textContent = t('lblVertK');
+  document.getElementById('lblVertR').textContent = t('lblVertR');
+  document.getElementById('lblTwist').textContent = t('lblTwist');
+  document.getElementById('actionTitle').textContent = t('actionTitle');
+  document.getElementById('btnComputeBox').textContent = t('computeBtn');
+  document.getElementById('dlTitle').textContent = t('dlTitle');
+  document.getElementById('downloadLink').textContent = t('dlLink');
+  document.getElementById('langSwitch').textContent = lang === 'zh' ? 'English' : '中文';
+}
+
+window.toggleLang = function() {
+  lang = lang === 'zh' ? 'en' : 'zh';
+  applyLang();
+  // Refresh status messages if any
+  const st = document.getElementById('status');
+  if (st.className === 'info' && st.textContent) {
+    if (st.textContent.includes('加载') || st.textContent.includes('计算') || st.textContent.includes('已加载'))
+      showStatus('info', st._rawMsg || '');
+  }
+};
 
 async function init() {
-    showStatus('info', '正在加载 WASM 模块...');
+    applyLang();
+    showStatus('info', t('loading'));
     try {
         mod = await SheetMetalUnfolderModule({
             print: t => console.log('[out]', t),
             printErr: t => console.error('[err]', t),
         });
-        showStatus('success', 'WASM 模块加载成功');
+        showStatus('success', t('loaded'));
         document.getElementById('btnComputeBox').disabled = false;
     } catch (e) {
-        showStatus('error', 'WASM 加载失败: ' + e.message);
+        showStatus('error', t('loadFailed') + ': ' + e.message);
     }
 }
 
 function showStatus(type, msg) {
     const el = document.getElementById('status');
     el.className = type;
+    el._rawMsg = msg;
     el.textContent = msg;
 }
 
@@ -97,9 +195,9 @@ function getParams() {
 }
 
 async function doComputeBox() {
-    if (!stepBuffer) { showStatus('error', '请先加载 STEP 文件'); return; }
+    if (!stepBuffer) { showStatus('error', t('noFile')); return; }
     const p = getParams();
-    showStatus('info', '正在计算并展平模型...');
+    showStatus('info', t('computing'));
 
     const ptr = mod._malloc(stepBuffer.byteLength);
     mod.writeArrayToMemory(new Uint8Array(stepBuffer), ptr);
@@ -116,7 +214,7 @@ async function doComputeBox() {
     mod._free(ptr);
 
     if (result && result.length > 2) {
-        showStatus('success', '计算 + 展平模型 成功');
+        showStatus('success', t('success'));
         const sepIdx = result.indexOf('\n---STEP_DATA---\n');
         if (sepIdx >= 0) {
             const stepPart = result.substring(sepIdx + '\n---STEP_DATA---\n'.length);
@@ -131,7 +229,7 @@ async function doComputeBox() {
             document.getElementById('downloadCard').style.display = 'none';
         }
     } else {
-        showStatus('error', '计算失败: ' + err);
+        showStatus('error', t('failed') + ': ' + err);
     }
 }
 
@@ -139,7 +237,7 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     stepBuffer = await file.arrayBuffer();
-    showStatus('info', `已加载: ${file.name} (${(stepBuffer.byteLength / 1024).toFixed(1)} KB)`);
+    showStatus('info', t('fileLoaded') + `: ${file.name} (${(stepBuffer.byteLength / 1024).toFixed(1)} KB)`);
 });
 
 document.getElementById('btnComputeBox').addEventListener('click', doComputeBox);
