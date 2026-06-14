@@ -77,6 +77,9 @@ button.running { background: #b8860b; pointer-events: none; }
   <h3 id="dlTitle">展平模型下载</h3>
   <a id="downloadLink" href="#" download="unfolded_box.stp" style="display:inline-block;background:#0e639c;color:#fff;padding:10px 24px;border-radius:4px;text-decoration:none;font-size:15px;">下载展平后的 STEP 文件</a>
   <span id="downloadSize" style="margin-left:12px;color:#888;font-size:13px;"></span>
+  <br><br>
+  <a id="downloadJsonLink" href="#" download="manufacture_feature.json" style="display:inline-block;background:#0e639c;color:#fff;padding:10px 24px;border-radius:4px;text-decoration:none;font-size:15px;">下载制造特征 JSON 文件</a>
+  <span id="downloadJsonSize" style="margin-left:12px;color:#888;font-size:13px;"></span>
 </div>
 
 <script type="module">
@@ -107,6 +110,7 @@ const T = {
     computeBtn: '获取展平后的 STEP 模型',
     dlTitle: '展平模型下载',
     dlLink: '下载展平后的 STEP 文件',
+    dlJsonLink: '下载制造特征 JSON 文件',
     loading: '正在下载展开算法...',
     loaded: '算法下载完成，初始化中...',
     loadFailed: '算法下载失败',
@@ -137,6 +141,7 @@ const T = {
     computeBtn: 'Get Unfolded STEP Model',
     dlTitle: 'Unfolded Model Download',
     dlLink: 'Download Unfolded STEP File',
+    dlJsonLink: 'Download Manufacturing Feature JSON',
     loading: 'Downloading unfolding engine...',
     loaded: 'Engine downloaded, initializing...',
     loadFailed: 'Engine download failed',
@@ -167,6 +172,7 @@ function applyLang() {
   document.getElementById('btnComputeBox').innerHTML = t('computeBtn') + ' <span class="spinner" id="computeSpinner"></span>';
   document.getElementById('dlTitle').textContent = t('dlTitle');
   document.getElementById('downloadLink').textContent = t('dlLink');
+  document.getElementById('downloadJsonLink').textContent = t('dlJsonLink');
   document.getElementById('imgCaption').textContent = t('imgCaption');
   document.getElementById('langSwitch').textContent = lang === 'zh' ? 'English' : '中文';
 }
@@ -317,13 +323,20 @@ async function doComputeBox() {
         showStatus('success', t('success'));
         const sepIdx = result.indexOf('\n---STEP_DATA---\n');
         if (sepIdx >= 0) {
+            const jsonPart = result.substring(0, sepIdx);
             const stepPart = result.substring(sepIdx + '\n---STEP_DATA---\n'.length);
+            // STEP download
             const blob = new Blob([stepPart], { type: 'application/octet-stream' });
             const url = URL.createObjectURL(blob);
             const card = document.getElementById('downloadCard');
             const link = document.getElementById('downloadLink');
             link.href = url;
             document.getElementById('downloadSize').textContent = `(${(stepPart.length / 1024).toFixed(1)} KB)`;
+            // JSON download
+            const jsonBlob = new Blob([jsonPart], { type: 'application/json' });
+            const jsonUrl = URL.createObjectURL(jsonBlob);
+            document.getElementById('downloadJsonLink').href = jsonUrl;
+            document.getElementById('downloadJsonSize').textContent = `(${(jsonPart.length / 1024).toFixed(1)} KB)`;
             card.style.display = 'block';
         } else {
             document.getElementById('downloadCard').style.display = 'none';
